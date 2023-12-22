@@ -3,16 +3,16 @@ package avatar.type
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ProgramSetting (
+data class ProgramSetting(
     var lastUsedAvtr: String? = null,
     val avtrSetting: MutableList<AvatarSetting> = mutableListOf()
 )
 
 @Serializable
-data class AvatarSetting (
+data class AvatarSetting(
     val avtrId: String,
-    val param: MutableList<String> = mutableListOf()
-    ) {
+    var param: List<String> = emptyList()
+) {
     override fun equals(other: Any?): Boolean {
         if (other == null) return false
         if (other !is AvatarSetting) return false

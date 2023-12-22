@@ -1,8 +1,9 @@
 import avatar.SettingHandler
-import avatar.observer.Broadcaster
 import config.Config
 import di.CONTAINER
 import param.AvatarParamHandler
+import ui.SelectListeningParam
+import javax.swing.SwingUtilities
 
 fun main() {
     CONTAINER[Config::class.java] = Config()
@@ -10,6 +11,7 @@ fun main() {
     CONTAINER[AvatarParamHandler::class.java] = AvatarParamHandler()
     CONTAINER[SettingHandler::class.java] = SettingHandler()
 
-    while (true)
-        Thread.sleep(10000)
+    SwingUtilities.invokeLater {
+        SelectListeningParam()
+    }
 }

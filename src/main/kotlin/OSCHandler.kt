@@ -1,4 +1,4 @@
-import avatar.observer.Broadcaster
+import avatar.observer.OSCBroadcaster
 import com.illposed.osc.OSCBadDataEvent
 import com.illposed.osc.OSCMessage
 import com.illposed.osc.OSCPacketEvent
@@ -10,7 +10,7 @@ import di.CONTAINER
 import java.net.InetAddress
 import java.net.InetSocketAddress
 
-class OSCHandler : Broadcaster() {
+class OSCHandler : OSCBroadcaster() {
     private val config: Config by lazy {
         CONTAINER[Config::class.java] as Config
     }
@@ -21,9 +21,9 @@ class OSCHandler : Broadcaster() {
     private val txPort = config["osc.port.tx"].toInt()
 
     private val oscTX = OSCPortOut(InetSocketAddress(InetAddress.getByAddress(byteAddress), txPort))
-    val oscRX = OSCPortIn(InetSocketAddress(InetAddress.getByAddress(byteAddress), rxPort))
+    private val oscRX = OSCPortIn(InetSocketAddress(InetAddress.getByAddress(byteAddress), rxPort))
 
-    var nowListener: OSCPacketListener = object : OSCPacketListener {
+    private var nowListener: OSCPacketListener = object : OSCPacketListener {
         override fun handlePacket(event: OSCPacketEvent?) {
             val message = event!!.packet as OSCMessage
             broadcast(message)
@@ -34,10 +34,11 @@ class OSCHandler : Broadcaster() {
         }
 
     }
+
     init {
         oscRX.addPacketListener(nowListener)
         oscRX.startListening()
-        println("Listening to ${byteAddress.map{it.toInt()}}:$txPort:$rxPort")
+        println("Listening to ${byteAddress.map { it.toInt() }}:$txPort:$rxPort")
     }
 
     fun <T> sendMsg(path: String, payload: T) {
@@ -45,7 +46,7 @@ class OSCHandler : Broadcaster() {
         oscTX.send(msg)
     }
 
-    fun setNewListener(listener: OSCPacketListener) {
+    private fun setNewListener(listener: OSCPacketListener) {
         oscRX.removePacketListener(this.nowListener)
         oscRX.stopListening()
         oscRX.addPacketListener(listener)

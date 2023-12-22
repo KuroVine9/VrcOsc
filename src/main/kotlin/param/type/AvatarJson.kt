@@ -13,7 +13,7 @@ data class AvatarJson(
 data class Parameter(
     val name: String,
     val input: OscIO? = null,
-    val output: OscIO? = null
+    val output: OscIO
 )
 
 @Serializable
