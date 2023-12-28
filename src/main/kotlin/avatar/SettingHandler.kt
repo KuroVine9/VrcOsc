@@ -12,6 +12,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import param.AvatarParamHandler
 import java.io.File
+import java.util.*
 
 class SettingHandler : OSCSubscriber, AvatarBroadcaster() {
     private val osc: OSCHandler by lazy {
@@ -26,16 +27,29 @@ class SettingHandler : OSCSubscriber, AvatarBroadcaster() {
 
     private var _nowAvtrId: String? = null
     private var _nowAvtrSetting: AvatarSetting? = null
+    private var _myName: String? = null
+
     val nowAvtrId: String?
         get() = _nowAvtrId
 
     val nowAvtrSetting: AvatarSetting?
         get() = _nowAvtrSetting
 
+    var myName: String
+        get() {
+            return _myName ?: Json.decodeFromString<ProgramSetting>(settingFile.readText()).name
+        }
+        set(value) {
+            val programSetting = Json.decodeFromString<ProgramSetting>(settingFile.readText())
+            programSetting.name = value
+            settingFile.writeText(Json.encodeToString(programSetting))
+            _myName = value
+        }
+
     init {
         if (!settingFile.exists()) {
             settingFile.createNewFile()
-            settingFile.writeText(Json.encodeToString(ProgramSetting()))
+            settingFile.writeText(Json.encodeToString(ProgramSetting(UUID.randomUUID().toString())))
         }
 
         osc.attach(AVATAR_CHANGE, this)

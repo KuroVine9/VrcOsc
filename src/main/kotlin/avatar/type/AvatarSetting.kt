@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ProgramSetting(
+    var name: String,
     var lastUsedAvtr: String? = null,
     val avtrSetting: MutableList<AvatarSetting> = mutableListOf()
 )
