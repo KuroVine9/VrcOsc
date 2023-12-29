@@ -203,7 +203,7 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
         }
 
 
-        val clientAddButton = JButton("연결(클라이언트) 추가")
+        val clientAddButton = JButton("서버 추가")
         val listSelected = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount != 2 && !SwingUtilities.isRightMouseButton(e)) return
@@ -274,7 +274,7 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
             radioPanel.add(wssRadio)
             wsRadio.isSelected = true
 
-            val addButton = JButton("추가")
+            val addButton = JButton("연결")
             val connectTextTimer = Timer(2000, ActionListener {
                 addButton.text = addButton.text + "."
             })
