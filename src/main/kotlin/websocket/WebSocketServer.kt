@@ -6,8 +6,9 @@ import di.CONTAINER
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import websocket.type.ParamInfo
 import websocket.type.ParamPayload
-import websocket.type.ParamSetRequest
+import websocket.type.PayloadInfo
 import websocket.type.PayloadType
 import javax.websocket.*
 import javax.websocket.server.PathParam
@@ -30,11 +31,13 @@ class WebSocketServer {
 
     @OnMessage
     fun onMessage(session: Session, message: String) {
-        val json = Json.decodeFromString<ParamPayload<Any>>(message)
-        when (json.type) {
+        val jsonParser = Json { ignoreUnknownKeys = true }
+        val info = jsonParser.decodeFromString<PayloadInfo>(message)
+        when (info.type) {
             PayloadType.SET.ordinal -> {
+                val json = jsonParser.decodeFromString<ParamPayload<ParamInfo>>(message)
                 val avtrSetting = setting.nowAvtrSetting ?: return
-                val payload = json.payload as ParamSetRequest
+                val payload = json.payload
 
                 if (payload.param in avtrSetting.param) {
                     // 파라미터 set
@@ -123,6 +126,6 @@ class WebSocketServer {
 
     @OnError
     fun onError(session: Session, e: Throwable) {
-
+        e.printStackTrace()
     }
 }

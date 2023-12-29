@@ -4,6 +4,7 @@ import OSCHandler
 import avatar.SettingHandler
 import avatar.observer.AvatarSubscriber
 import avatar.observer.OSCSubscriber
+import avatar.type.ConnectionInfo
 import com.illposed.osc.OSCMessage
 import di.CONTAINER
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -13,16 +14,21 @@ import param.AvatarParamHandler
 import websocket.WebSocketClient
 import websocket.WebSocketServer
 import websocket.type.DEFAULT_WS_URL
+import websocket.type.ParamInfo
+import websocket.type.ParamPayload
+import websocket.type.PayloadType
 import java.awt.*
 import java.awt.event.*
 import java.util.*
 import javax.swing.*
+import javax.swing.JOptionPane.YES_NO_OPTION
 import javax.swing.SpringLayout.*
 import javax.swing.Timer
 import javax.swing.border.EmptyBorder
 import javax.swing.border.LineBorder
 
 
+@OptIn(DelicateCoroutinesApi::class)
 class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
 
     private val subscribedMap = HashMap<String, JLabel>()
@@ -54,6 +60,23 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
         setting.attach(this)
 
         setting.nowAvtrId?.let { whenAvatarChanged(it, setting.nowAvtrSetting?.param ?: emptyList()) }
+        GlobalScope.launch {
+            setting.wsSetting.autoConnectServer.forEach {
+                val connection = WebSocketClient(
+                    it.ip, it.path, it.port, it.isWss,
+                    openCallback = { serverName, client ->
+                        wsClient.add(client)
+                    },
+                    closeCallback = { reason, client ->
+                        wsClient.remove(client)
+                        println(reason.reasonPhrase)
+                    },
+                    connErrCallback = {
+                        it.printStackTrace()
+                    }
+                )
+            }
+        }.start()
     }
 
     private fun createMainUI(): Container {
@@ -186,8 +209,15 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
         return selectParamPanel
     }
 
+    private fun refresh(panel: JPanel, createComp: (JPanel) -> Unit) {
+        panel.removeAll()
+        createComp(panel)
+        panel.revalidate()
+        panel.repaint()
+    }
+
     private fun createManageConnectionPanel(panel: JPanel) {
-        val layout = BorderLayout()
+        val layout = GridBagLayout()
         panel.layout = layout
         panel.border = LineBorder(Color.BLUE, 3)
         panel.size = Dimension(Int.MAX_VALUE, Int.MAX_VALUE)
@@ -195,12 +225,6 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
             addAll(wsClient.map { it.toString() })
         }
         val list = JList(listModel)
-        fun refresh() {
-            panel.removeAll()
-            createManageConnectionPanel(panel)
-            panel.revalidate()
-            panel.repaint()
-        }
 
 
         val clientAddButton = JButton("서버 추가")
@@ -221,6 +245,60 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
                 wsClient[index].closeSession()
             }
         }
+
+        val toDelete = mutableSetOf<ConnectionInfo>()
+
+        fun clientSettingPanel(): JPanel {
+            val panel = JPanel()
+            setting.wsSetting.autoConnectServer.forEach { connInfo ->
+                val checkbox =
+                    JCheckBox("${if (connInfo.isWss) "wss" else "ws"}://${connInfo.ip}:${connInfo.port}/${connInfo.path}")
+                checkbox.addActionListener {
+                    val source = it.source as JCheckBox
+                    if (source.isSelected) {
+                        toDelete.add(connInfo)
+                    }
+                    else {
+                        toDelete.remove(connInfo)
+                    }
+                }
+                panel.add(checkbox)
+            }
+            val deleteButton = JButton("삭제")
+            deleteButton.addActionListener {
+                val ans = JOptionPane.showConfirmDialog(
+                    this@SelectListeningParam,
+                    "자동 연결 정보를 삭제하시겠습니까?",
+                    "삭제",
+                    YES_NO_OPTION
+                )
+
+                if (ans != JOptionPane.YES_OPTION) return@addActionListener
+
+                val wsSetting = setting.wsSetting
+                val serverList = (wsSetting.autoConnectServer.toMutableSet() - toDelete).toList()
+                wsSetting.autoConnectServer = serverList
+                setting.wsSetting = wsSetting
+
+                with(panel.parent) {
+                    this.removeAll()
+                    this.add(clientSettingPanel())
+                    this.revalidate()
+                    this.repaint()
+                }
+            }
+            panel.add(deleteButton)
+            return panel
+        }
+
+        val clientSettingButton = JButton("자동연결 관리")
+        clientSettingButton.addActionListener {
+            panel.removeAll()
+            panel.add(clientSettingPanel())
+            panel.revalidate()
+            panel.repaint()
+        }
+
 
         fun addClientPanel(): JPanel {
             val addClientPanel = JPanel(GridLayout(0, 1, 20, 20))
@@ -274,6 +352,10 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
             radioPanel.add(wssRadio)
             wsRadio.isSelected = true
 
+            // 자동연결 체크박스
+            val autoConnectCheck = JCheckBox("프로그램 시작 시 자동 연결")
+            autoConnectCheck.isSelected = true
+
             val addButton = JButton("연결")
             val connectTextTimer = Timer(2000, ActionListener {
                 addButton.text = addButton.text + "."
@@ -301,6 +383,21 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
 
 
             addButton.addActionListener {
+                if (autoConnectCheck.isSelected) {
+                    val serverSetting = setting.wsSetting
+                    serverSetting.autoConnectServer = serverSetting.autoConnectServer.toMutableSet().apply {
+                        add(
+                            ConnectionInfo(
+                                ip = ipField.text,
+                                port = portField.text.toInt(),
+                                path = pathField.text,
+                                isWss = wssRadio.isSelected
+                            )
+                        )
+                    }.toList()
+                    setting.wsSetting = serverSetting
+                }
+
                 connectTextTimer.start()
                 timeoutTimer.schedule(timeoutTask, 10000)
                 val connection = WebSocketClient(
@@ -322,12 +419,16 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
                             JOptionPane.OK_CANCEL_OPTION
                         )
 
-                        refresh()
+                        refresh(panel) {
+                            createManageConnectionPanel(it)
+                        }
                     },
                     closeCallback = { reason, client ->
                         wsClient.remove(client)
                         println(wsClient)
-                        refresh()
+                        refresh(panel) {
+                            createManageConnectionPanel(it)
+                        }
                     },
                     connErrCallback = {
                         it.printStackTrace()
@@ -361,6 +462,7 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
             addClientPanel.add(portPanel)
             addClientPanel.add(pathPanel)
             addClientPanel.add(radioPanel)
+            addClientPanel.add(autoConnectCheck)
             addClientPanel.add(addButton)
 
             return addClientPanel
@@ -375,8 +477,35 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
         }
 
         panel.apply {
-            add(list, BorderLayout.CENTER)
-            add(clientAddButton, BorderLayout.SOUTH)
+//            add(list, BorderLayout.CENTER)
+//            add(clientAddButton, BorderLayout.SOUTH)
+//            add(clientSettingButton)
+            layout.setConstraints(list, GridBagConstraints().apply {
+                fill = GridBagConstraints.BOTH
+                gridx = 0
+                gridy = 0
+                gridwidth = 4
+                gridheight = 4
+            })
+            add(list)
+
+            layout.setConstraints(clientAddButton, GridBagConstraints().apply {
+                fill = GridBagConstraints.BOTH
+                gridx = 0
+                gridy = 4
+                gridwidth = 3
+                gridheight = 1
+            })
+            add(clientAddButton)
+
+            layout.setConstraints(clientSettingButton, GridBagConstraints().apply {
+                fill = GridBagConstraints.BOTH
+                gridx = 3
+                gridy = 4
+                gridwidth = 1
+                gridheight = 1
+            })
+            add(clientSettingButton)
         }
     }
 
@@ -408,18 +537,31 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
     }
 
     override fun gotUpdate(message: OSCMessage) {
-        subscribedMap[message.address]?.let {
-            val value = when (message.info.argumentTypeTags) {
-                "T", "F" -> message.arguments.firstOrNull() as Boolean?
-                "f" -> message.arguments.firstOrNull() as Float?
-                "i" -> message.arguments.firstOrNull() as Int?
-                "s" -> message.arguments.firstOrNull() as String?
-                else -> throw RuntimeException("invalid info: ${message.info.argumentTypeTags}")
-            }
+        val value = when (message.info.argumentTypeTags) {
+            "T", "F" -> message.arguments.firstOrNull() as Boolean?
+            "f" -> message.arguments.firstOrNull() as Float?
+            "i" -> message.arguments.firstOrNull() as Int?
+            "s" -> message.arguments.firstOrNull() as String?
+            else -> throw RuntimeException("invalid info: ${message.info.argumentTypeTags}")
+        }
 
+        subscribedMap[message.address]?.let {
             it.text = "${message.address.split("/").last()} : $value"
         }
 
+        for (ws in wsClient) {
+            ws.sendMessage(
+                ParamPayload(
+                    from = setting.myName,
+                    type = PayloadType.VAL_CHANGE.ordinal,
+                    payload = ParamInfo(
+                        param = message.address,
+                        paramType = message.info.argumentTypeTags.first(),
+                        setTo = message.arguments.firstOrNull().toString()
+                    )
+                )
+            )
+        }
     }
 
     override fun gotUpdate(avtrId: String, params: List<String>) {

@@ -6,8 +6,24 @@ import kotlinx.serialization.Serializable
 data class ProgramSetting(
     var name: String,
     var lastUsedAvtr: String? = null,
-    val avtrSetting: MutableList<AvatarSetting> = mutableListOf()
+    val avtrSetting: MutableList<AvatarSetting> = mutableListOf(),
+    var wsSetting: WSSetting = WSSetting()
 )
+
+@Serializable
+data class WSSetting(
+    var isServerAutoOn: Boolean = false,
+    var autoConnectServer: List<ConnectionInfo> = emptyList()
+)
+
+@Serializable
+data class ConnectionInfo(
+    var ip: String,
+    var port: Int,
+    var path: String = "",
+    var isWss: Boolean = false
+)
+
 
 @Serializable
 data class AvatarSetting(

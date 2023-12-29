@@ -30,7 +30,7 @@ class WebSocketClient(
         CONTAINER[SettingHandler::class.java] as SettingHandler
     }
     private var serverName: String = "<no-name-provided>"
-    private var session: Session? = null
+    var session: Session? = null
 
     init {
         try {
@@ -56,7 +56,7 @@ class WebSocketClient(
         }
     }
 
-    fun <T> sendMessage(message: ParamPayload<T>) {
+    inline fun <reified T> sendMessage(message: ParamPayload<T>) {
         session!!.asyncRemote.sendText(
             Json.encodeToString(message)
         )
@@ -69,7 +69,7 @@ class WebSocketClient(
         val info = jsonParser.decodeFromString<PayloadInfo>(message)
         when (info.type) {
             PayloadType.SET.ordinal -> {
-                val json = jsonParser.decodeFromString<ParamPayload<ParamSetRequest>>(message)
+                val json = jsonParser.decodeFromString<ParamPayload<ParamInfo>>(message)
                 val avtrSetting = setting.nowAvtrSetting ?: return
                 val payload = json.payload
 
@@ -114,6 +114,8 @@ class WebSocketClient(
                 serverName = info.from
                 openCallback(serverName, this)
             }
+
+            PayloadType.VAL_CHANGE.ordinal -> {}
 
             else -> {
                 println("Unhandled Type!")

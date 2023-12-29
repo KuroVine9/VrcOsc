@@ -5,6 +5,7 @@ import avatar.observer.AvatarBroadcaster
 import avatar.observer.OSCSubscriber
 import avatar.type.AvatarSetting
 import avatar.type.ProgramSetting
+import avatar.type.WSSetting
 import com.illposed.osc.OSCMessage
 import di.CONTAINER
 import kotlinx.serialization.decodeFromString
@@ -28,6 +29,7 @@ class SettingHandler : OSCSubscriber, AvatarBroadcaster() {
     private var _nowAvtrId: String? = null
     private var _nowAvtrSetting: AvatarSetting? = null
     private var _myName: String? = null
+    private var _wsSetting: WSSetting? = null
 
     val nowAvtrId: String?
         get() = _nowAvtrId
@@ -44,6 +46,15 @@ class SettingHandler : OSCSubscriber, AvatarBroadcaster() {
             programSetting.name = value
             settingFile.writeText(Json.encodeToString(programSetting))
             _myName = value
+        }
+
+    var wsSetting: WSSetting
+        get() = _wsSetting ?: Json.decodeFromString<ProgramSetting>(settingFile.readText()).wsSetting
+        set(value) {
+            val programSetting = Json.decodeFromString<ProgramSetting>(settingFile.readText())
+            programSetting.wsSetting = value
+            settingFile.writeText(Json.encodeToString(programSetting))
+            _wsSetting = value
         }
 
     init {
