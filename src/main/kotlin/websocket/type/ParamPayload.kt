@@ -22,6 +22,12 @@ data class ParamPayload<T>(
     val payload: T
 )
 
+@Serializable
+data class PayloadInfo(
+    val from: String,
+    val type: Int,
+)
+
 /**
  * [paramType]는 OSC Tag Type 정보를 담습니다.
  * { i: int32, f: float32, s: OSC-string, T: True, F: False }

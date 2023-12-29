@@ -7,10 +7,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.glassfish.tyrus.client.ClientManager
-import websocket.type.DEFAULT_WS_URL
-import websocket.type.ParamPayload
-import websocket.type.ParamSetRequest
-import websocket.type.PayloadType
+import websocket.type.*
 import java.io.IOException
 import java.net.ConnectException
 import java.net.URI
@@ -19,7 +16,7 @@ import javax.websocket.*
 @ClientEndpoint
 class WebSocketClient(
     private val ip: String,
-    private val path: String? = null,
+    private val path: String = "",
     private val port: Int = 80,
     private val isWss: Boolean = false,
     val openCallback: (String, WebSocketClient) -> Unit,
@@ -32,13 +29,13 @@ class WebSocketClient(
     private val setting: SettingHandler by lazy {
         CONTAINER[SettingHandler::class.java] as SettingHandler
     }
-    private lateinit var serverName: String
+    private var serverName: String = "<no-name-provided>"
     private var session: Session? = null
 
     init {
         try {
             val endpointUri =
-                URI("${if (isWss) "wss" else "ws"}://$ip:$port/${path ?: (DEFAULT_WS_URL + '/' + setting.myName)}")
+                URI("${if (isWss) "wss" else "ws"}://$ip:$port/${path}")
             val clientManager = ClientManager.createClient()
             session = clientManager.connectToServer(this, endpointUri)
         }
@@ -67,11 +64,14 @@ class WebSocketClient(
 
     @OnMessage
     fun onMessage(message: String) {
-        val json = Json.decodeFromString<ParamPayload<Any>>(message)
-        when (json.type) {
+        println(message)
+        val jsonParser = Json { ignoreUnknownKeys = true }
+        val info = jsonParser.decodeFromString<PayloadInfo>(message)
+        when (info.type) {
             PayloadType.SET.ordinal -> {
+                val json = jsonParser.decodeFromString<ParamPayload<ParamSetRequest>>(message)
                 val avtrSetting = setting.nowAvtrSetting ?: return
-                val payload = json.payload as ParamSetRequest
+                val payload = json.payload
 
                 if (payload.param in avtrSetting.param) {
                     // 파라미터 set
@@ -111,7 +111,7 @@ class WebSocketClient(
             }
 
             PayloadType.NAME.ordinal -> {
-                serverName = json.from
+                serverName = info.from
                 openCallback(serverName, this)
             }
 

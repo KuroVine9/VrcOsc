@@ -27,6 +27,7 @@ class OSCHandler : OSCBroadcaster() {
         override fun handlePacket(event: OSCPacketEvent?) {
             val message = event!!.packet as OSCMessage
             broadcast(message)
+            println("${message.address}: ${message.arguments.firstOrNull()}")
         }
 
         override fun handleBadData(event: OSCBadDataEvent?) {

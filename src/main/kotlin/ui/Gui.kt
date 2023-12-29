@@ -191,9 +191,18 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
         panel.layout = layout
         panel.border = LineBorder(Color.BLUE, 3)
         panel.size = Dimension(Int.MAX_VALUE, Int.MAX_VALUE)
-        val listModel = DefaultListModel<String>()
-        listModel.addAll(wsClient.map { it.toString() })
+        var listModel = DefaultListModel<String>().apply {
+            addAll(wsClient.map { it.toString() })
+        }
         val list = JList(listModel)
+        fun refresh() {
+            panel.removeAll()
+            createManageConnectionPanel(panel)
+            panel.revalidate()
+            panel.repaint()
+        }
+
+
         val clientAddButton = JButton("연결(클라이언트) 추가")
         val listSelected = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
@@ -265,24 +274,32 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
             radioPanel.add(wssRadio)
             wsRadio.isSelected = true
 
-            val popupText = JLabel("연결 중")
-            val connectConfirmButton = JButton("확인")
-            connectConfirmButton.isEnabled = false
-
+            val addButton = JButton("추가")
             val connectTextTimer = Timer(2000, ActionListener {
-                popupText.text = popupText.text + "."
+                addButton.text = addButton.text + "."
             })
 
             val timeoutTask: TimerTask = object : TimerTask() {
                 override fun run() {
                     connectTextTimer.stop()
-                    popupText.text = "연결 실패"
-                    connectConfirmButton.isEnabled = true
+                    addButton.text = "확인"
+
+                    val ans = JOptionPane.showConfirmDialog(
+                        this@SelectListeningParam,
+                        "연결 실패",
+                        "WS Client",
+                        JOptionPane.OK_CANCEL_OPTION
+                    )
+
+                    panel.removeAll()
+                    panel.add(addClientPanel())
+                    panel.revalidate()
+                    panel.repaint()
                 }
             }
             val timeoutTimer = java.util.Timer("timeout")
 
-            val addButton = JButton("추가")
+
             addButton.addActionListener {
                 connectTextTimer.start()
                 timeoutTimer.schedule(timeoutTask, 10000)
@@ -296,14 +313,21 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
                         timeoutTimer.cancel()
                         timeoutTimer.purge()
                         connectTextTimer.stop()
-                        popupText.text = "연결 성공 : $serverName"
+                        addButton.text = "확인"
                         wsClient.add(client)
-                        listModel.addElement(client.toString())
-                        connectConfirmButton.isEnabled = true
+                        val ans = JOptionPane.showConfirmDialog(
+                            this,
+                            "연결 성공 : $serverName",
+                            "WS Client",
+                            JOptionPane.OK_CANCEL_OPTION
+                        )
+
+                        refresh()
                     },
                     closeCallback = { reason, client ->
                         wsClient.remove(client)
-                        listModel.removeElement(client.toString())
+                        println(wsClient)
+                        refresh()
                     },
                     connErrCallback = {
                         it.printStackTrace()
@@ -311,31 +335,26 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
                         timeoutTimer.cancel()
                         timeoutTimer.purge()
                         connectTextTimer.stop()
-                        popupText.text = "연결 실패"
-                        connectConfirmButton.isEnabled = true
+                        addButton.text = "확인"
+
+                        val ans = JOptionPane.showConfirmDialog(
+                            this,
+                            "연결 실패",
+                            "WS Client",
+                            JOptionPane.OK_CANCEL_OPTION
+                        )
+
+                        panel.removeAll()
+                        panel.add(addClientPanel())
+                        panel.revalidate()
+                        panel.repaint()
                     }
                 )
-                println("pop")
+
                 val bound = mainPanel.bounds
-                JPopupMenu().apply {
-                    val popup = this
-                    connectConfirmButton.addActionListener {
-                        addClientPanel.parent.apply {
-                            removeAll()
-                            add(addClientPanel())
-                            revalidate()
-                            repaint()
-                            popup.isVisible = false
-                        }
-                    }
-                    add(popupText)
-                    add(connectConfirmButton)
-                    bounds = bound
-                    val frameSize = this@SelectListeningParam.size
-                    val screenSize = Toolkit.getDefaultToolkit().screenSize
-                    this.location =
-                        Point((screenSize.width - frameSize.width) / 2, (screenSize.height - frameSize.height) / 2)
-                }.isVisible = true
+
+                addButton.isEnabled = false
+                addButton.text = "연결 중"
             }
 
             addClientPanel.add(ipPanel)
@@ -364,6 +383,7 @@ class SelectListeningParam : JFrame("title"), OSCSubscriber, AvatarSubscriber {
     @OptIn(DelicateCoroutinesApi::class)
     private fun whenAvatarChanged(avtrId: String, params: List<String>) {
         GlobalScope.launch {
+            println(avtrId)
             avatarId = avtrId
             subscribedMap.keys.forEach {
                 osc.detach(it, this@SelectListeningParam)
